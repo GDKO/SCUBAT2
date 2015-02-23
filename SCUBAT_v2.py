@@ -21,6 +21,7 @@ DEFAULT_TRANSCRIPT_OVERLAP_CUTOFF = 50
 DEFAULT_LIBRARY_INSERT_SIZE = 100
 DEFAULT_MAXIMUM_INTRON_SIZE = 0
 DEFAULT_TRANSCRIPT_COVERAGE_CUTOFF = 90
+DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG = 70
 
 parser = argparse.ArgumentParser(prog=DEFAULT_NAME,description='Scaffold contigs using Transcripts')
 parser.add_argument('-b','--blastfile', dest='blastfile',
@@ -414,6 +415,26 @@ for transcript in informative:
 
 print ''
 
+
+transcripts_passed = 0
+transcripts_failed = 0
+
+for transcript in informative:
+    pass_flag = 0 ;
+    transcript_span = {}
+    for hsp in transcript:
+        #transcript_span[hsp.hit_id] += hsp.aln_span
+        transcript_span[hsp.hit_id] = transcript_span.get(hsp.hit_id, 0) + hsp.aln_span 
+    for hit_id in transcript_span:
+        if ((transcript_span[hit_id]/transcript.query_length)*100) >= DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG:
+            pass_flag  = 1 ;
+    if pass_flag  == 1:
+        transcripts_passed += 1;
+    else:
+        transcripts_failed += 1;
+
+
+
 ###TEST
 
 connections = list(set(connections))
@@ -482,6 +503,8 @@ for x in connections_dict:
 
 '''
 
+transcripts_passed_number =  len(uninformative) + len(same_contig) + transcripts_passed
+
 # print the stats
 s.write('Program was called as:' + '\n')
 s.write(DEFAULT_NAME + '\n')
@@ -500,6 +523,12 @@ s.write('Transcripts hitting multiple contigs:' + str(len(informative)) + '\n')
 s.write('Intron_size Mean:'+ str(numpy.array(intron_sizes).mean(axis=0)) + '\t' + 'Median:' + str(numpy.median(numpy.array(intron_sizes), axis=0)) + '\t' + 'SD:' + str(numpy.array(intron_sizes).std(axis=0)) + '\n')
 s.write('Exon_Overlap Mean:'+ str(numpy.array(exon_overlaps).mean(axis=0)) + '\t' + 'Median:' + str(numpy.median(numpy.array(exon_overlaps), axis=0)) + '\t' +'SD:' + str(numpy.array(exon_overlaps).std(axis=0)) + '\n')
 s.write('Connections removed based on max intron size:' + str(conn_removed) + '\n')
+s.write('--------------------------------------------' + '\n')
+s.write('--------------------------------------------' + '\n')
+s.write('Transcripts with no hits:' + str(len(no_hit)) + '\n')
+s.write('Transcripts more than ' + str(DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG) + ' in one contig:' + str(transcripts_passed_number) + '\n')
+s.write('Transcripts less than ' + str(DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG) + ' in one contig:' + str(transcripts_failed) + '\n')
+
 #####
 # Ending prints
 #####
