@@ -6,6 +6,8 @@ import argparse
 import numpy
 import time
 import subprocess
+import networkx as nx
+from networkx import *
 from Bio import SearchIO
 from Bio._utils import getattr_str, trim_str
 from collections import OrderedDict
@@ -242,6 +244,7 @@ def propable_intron_size(hit_start_first,hit_end_first,orientation_first,contig_
     elif (orientation_first == "-" and orientation_second == "+"):
         p_intron_size = hit_start_first + hit_start_second
     return p_intron_size    
+
     
 #####
 # Begin
@@ -462,46 +465,61 @@ for trm in sucs_duplicates:
 
 print >>tr, "#connections removed"
 
+#NXCode
+DG=nx.DiGraph()
+G=nx.Graph()
+#NXCodeEND
+
+
 for conn in connections:
     pre,suc=conn.split('\t')
     if (pre in precs_duplicates or suc in sucs_duplicates):
         print >>tr, conn
     else:
         print >>confile, conn + '\t' + str("1") + '\t' + str("500")
+        #NXCode
+        DG.add_edge(pre,suc)
+        G.add_edge(pre,suc)
+        #NXCodeEND
     
+#NXCode
+start = time.time()
 
-'''
-to_remove = list(set(to_remove))
+start_nodes=[]
+end_nodes=[]
 
-for trm in to_remove:
-    connections_dict.pop(trm, None)
-    print >>tr, trm
-    
-values_to_remove = connections_dict.values()
-values_to_remove = list(set([x for x in values_to_remove if values_to_remove.count(x) > 1]))
+for node in DG.nodes():
+    indegree = DG.in_degree(node)
+    outdegree = DG.out_degree(node)
+    if outdegree == 1 and indegree == 0:
+        start_nodes.append(node)
+    elif outdegree == 0 and indegree == 1:
+        end_nodes.append(node)
 
-for x in values_to_remove:
-    print >>confile, x
+start_nodes=set(start_nodes)
+end_nodes=set(end_nodes)
 
-for conn in connections:
-    print >>confile, conn
+for path in nx.connected_components(G):
+    for node in path:
+        if node in start_nodes:
+            start_node=node
+        elif node in end_nodes:
+            end_node=node
+    final_path=shortest_path(DG, start_node, end_node)
+    print >>confiledict, final_path
 
 
 
-for x in connections_dict:
-    if not connections_dict[x] in values_to_remove:
-        print >>confiledict, x  + '\t' + connections_dict[x] + '\t' + str("1") + '\t' + str("500")
-        if '/f' in x:
-            tf=re.sub('/f','/r',x)
-        else:
-            tf=re.sub('/r','/f',x)
-        if '/f' in connections_dict[x]:
-            tr=re.sub('/f','/r',connections_dict[x])
-        else:
-            tr=re.sub('/r','/f',connections_dict[x])
-        print >>confiledict, tr  + '\t' + tf + '\t' + str("1") + '\t' + str("500")
 
-'''
+
+end = time.time()
+seconds = round((end - start),3)
+minutes = round((seconds/60),3)
+print ''
+print str(minutes)
+print ''
+#NXCodeEND
+
 
 transcripts_passed_number =  len(uninformative) + len(same_contig) + transcripts_passed
 
