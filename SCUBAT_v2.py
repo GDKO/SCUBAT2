@@ -263,7 +263,6 @@ o = open('Cyto_table.sif', 'w')
 v = open('Cyto_table_verbose.sif', 'w')
 p = open('prob_intron', 'w')
 c = open('connection_removed', 'w')
-ss = open('sspace_tab', 'w')
 l = open('nodes', 'w')
 confile = open('final.connections.txt', 'w')
 confiledict = open('connections.dict.txt', 'w')
@@ -383,20 +382,6 @@ for transcript in informative:
             p.write(str(p_intron) + '\t' + transcript.query_id + '\n')
             if ((p_intron+args.library_insert_size) < args.maximum_intron_size):
                 v.write(transcript.hsps[k].hit_id + '\t' + transcript.query_id + '\t' + transcript.hsps[k+1].hit_id + '\t' + transcript.hsps[k].strand + transcript.hsps[k+1].strand+ '\n')
-                # SSPACE files
-                if (transcript.hsps[k].strand == "+"):
-                    ss_start_one = transcript.hsps[k].hit_start
-                    ss_end_one = transcript.hsps[k].hit_end
-                else:
-                    ss_start_one = transcript.hsps[k].hit_end
-                    ss_end_one = transcript.hsps[k].hit_start
-                if (transcript.hsps[k+1].strand == "+"):
-                    ss_start_two = transcript.hsps[k+1].hit_start
-                    ss_end_two = transcript.hsps[k+1].hit_end
-                else:
-                    ss_start_two = transcript.hsps[k+1].hit_end
-                    ss_end_two = transcript.hsps[k+1].hit_start
-                ss.write(transcript.hsps[k].hit_id + '\t' + str(ss_start_one) + '\t' + str(ss_end_one) + '\t' +  transcript.hsps[k+1].hit_id + '\t' + str(ss_start_two) + '\t' + str(ss_end_two) + '\n')
                 if (transcript.hsps[k].strand == "+" and transcript.hsps[k+1].strand == "+"):
                     connections.append(transcript.hsps[k].hit_id + '/f' + '\t' + transcript.hsps[k+1].hit_id + '/f')
                     connections.append(transcript.hsps[k+1].hit_id + '/r' + '\t' + transcript.hsps[k].hit_id + '/r')
@@ -438,7 +423,6 @@ for transcript in informative:
 
 
 
-###TEST
 
 connections = list(set(connections))
 
