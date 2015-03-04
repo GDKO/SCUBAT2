@@ -257,6 +257,16 @@ def getPath(nodes, start):
         path.append(nodes[path[-1]])
 
     return path
+
+####
+# return the correct orientation of the contig
+####
+def getContig(ctgs, node):
+    if node[-1] == 'f':
+        return ctgs[node[:-2]]
+    else:
+        return str(Seq(ctgs[node[:-2]]).reverse_complement())
+
     
 #####
 # Begin
@@ -513,19 +523,7 @@ for start_node in start_nodes:
     if path[0] > path[-1]:
         i += 1    
         print >>confiledict, path
-        scaffold_file.write('>Path_' + str(i) + '\n')
-        for node in path:
-            node_id = node[:-2]
-            orientation = node[-2:]
-            if orientation == "/f":
-                scaffold_file.write(contigs[node_id])
-            elif orientation == "/r":
-                scaffold_file.write(str(Seq(contigs[node_id]).reverse_complement()))
-            if node == path[-1]:
-                scaffold_file.write('\n')
-            else:
-                scaffold_file.write(string_of_ns)
-
+        scaffold_file.write('>Path_' + str(i) + '\n' + string_of_ns.join([getContig(contigs,node) for node in path]) + '\n')
 
 
 for contig_id in contigs.keys():
@@ -535,6 +533,7 @@ for contig_id in contigs.keys():
 confiledict.close()
 scaffold_file.close()
 
+
 # END OF SCAFFOLDING
 
 
@@ -543,14 +542,16 @@ transcripts_passed_number =  len(uninformative) + len(same_contig) + transcripts
 # print the stats
 s.write('Program was called as:' + '\n')
 s.write(DEFAULT_NAME + '\n')
-s.write(' -b ' + '\t' + args.blastfile + '\n')
-s.write(' -tid ' + '\t' + str(args.transcript_identity_cutoff) + '\n')
-s.write(' -hid ' + '\t' + str(args.hsp_identity_cutoff) + '\n')
-s.write(' -eov ' + '\t' + str(args.exon_overlap_cutoff) + '\n')
-s.write(' -tov ' + '\t' + str(args.transcript_overlap_cutoff) + '\n')
-s.write(' -lis ' + '\t' + str(args.library_insert_size) + '\n')
-s.write(' -max ' + '\t' + str(args.maximum_intron_size) + '\n')
+s.write(' -b '    + '\t' + args.blastfile                       + '\n')
+s.write(' -f '    + '\t' + args.fastafile                       + '\n')
+s.write(' -hid '  + '\t' + str(args.hsp_identity_cutoff)        + '\n')
+s.write(' -tid '  + '\t' + str(args.transcript_identity_cutoff) + '\n')
 s.write(' -tcov ' + '\t' + str(args.transcript_coverage_cutoff) + '\n')
+s.write(' -max '  + '\t' + str(args.maximum_intron_size)        + '\n')
+s.write(' -eov '  + '\t' + str(args.exon_overlap_cutoff)        + '\n')
+s.write(' -tov '  + '\t' + str(args.transcript_overlap_cutoff)  + '\n')
+s.write(' -lis '  + '\t' + str(args.library_insert_size)        + '\n')
+s.write(' -ns '   + '\t' + str(args.number_of_ns)               + '\n')
 s.write('--------------------------------------------' + '\n')        
 s.write('Transcripts with no hits:' + str(len(no_hit)) + '\n')
 s.write('Transcripts with 1 hsp:' + str(len(uninformative)) + '\n')
