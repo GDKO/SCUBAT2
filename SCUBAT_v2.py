@@ -537,7 +537,7 @@ scaffold_file.close()
 # END OF SCAFFOLDING
 
 
-transcripts_passed_number =  len(uninformative) + len(same_contig) + transcripts_passed
+transcripts_passed_number = len(uninformative) + len(same_contig) + transcripts_passed
 
 # print the stats
 s.write('Program was called as:' + '\n')
@@ -552,19 +552,19 @@ s.write(' -eov '  + '\t' + str(args.exon_overlap_cutoff)        + '\n')
 s.write(' -tov '  + '\t' + str(args.transcript_overlap_cutoff)  + '\n')
 s.write(' -lis '  + '\t' + str(args.library_insert_size)        + '\n')
 s.write(' -ns '   + '\t' + str(args.number_of_ns)               + '\n')
-s.write('--------------------------------------------' + '\n')        
-s.write('Transcripts with no hits:' + str(len(no_hit)) + '\n')
+s.write('---------------------------------------------' + '\n')        
+s.write('Transcripts with no hits:' + str(len(no_hit))  + '\n')
 s.write('Transcripts with 1 hsp:' + str(len(uninformative)) + '\n')
-s.write('Transcripts hitting 1 contig with multiple hsps:' + str(len(same_contig)) + '\n')
-s.write('Transcripts hitting multiple contigs:' + str(len(informative)) + '\n')
-s.write('Intron_size Mean:'+ str(numpy.array(intron_sizes).mean(axis=0)) + '\t' + 'Median:' + str(numpy.median(numpy.array(intron_sizes), axis=0)) + '\t' + 'SD:' + str(numpy.array(intron_sizes).std(axis=0)) + '\n')
-s.write('Exon_Overlap Mean:'+ str(numpy.array(exon_overlaps).mean(axis=0)) + '\t' + 'Median:' + str(numpy.median(numpy.array(exon_overlaps), axis=0)) + '\t' +'SD:' + str(numpy.array(exon_overlaps).std(axis=0)) + '\n')
+s.write('Transcripts hitting 1 contig with multiple hsps:'  + str(len(same_contig)) + '\n')
+s.write('Transcripts hitting multiple contigs:'             + str(len(informative)) + '\n')
+s.write('Intron_size Mean:'  + str(numpy.array(intron_sizes).mean(axis=0))  + '\t' + 'Median:' + str(numpy.median(numpy.array(intron_sizes), axis=0))  + '\t' + 'SD:' + str(numpy.array(intron_sizes).std(axis=0))  + '\n')
+s.write('Exon_Overlap Mean:' + str(numpy.array(exon_overlaps).mean(axis=0)) + '\t' + 'Median:' + str(numpy.median(numpy.array(exon_overlaps), axis=0)) + '\t' + 'SD:' + str(numpy.array(exon_overlaps).std(axis=0)) + '\n')
 s.write('Connections removed based on max intron size:' + str(conn_removed) + '\n')
-s.write('--------------------------------------------' + '\n')
-s.write('--------------------------------------------' + '\n')
-s.write('Transcripts with no hits:' + str(len(no_hit)) + '\n')
+s.write('---------------------------------------------' + '\n')
+s.write('---------------------------------------------' + '\n')
+s.write('Transcripts with no hits:' + str(len(no_hit))  + '\n')
 s.write('Transcripts more than ' + str(DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG) + ' in one contig:' + str(transcripts_passed_number) + '\n')
-s.write('Transcripts less than ' + str(DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG) + ' in one contig:' + str(transcripts_failed) + '\n')
+s.write('Transcripts less than ' + str(DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG) + ' in one contig:' + str(transcripts_failed)        + '\n')
 
 
 s.close()
