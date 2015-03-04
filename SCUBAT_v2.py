@@ -6,8 +6,6 @@ import argparse
 import numpy
 import time
 import subprocess
-import networkx as nx
-from networkx import *
 from Bio import SearchIO
 from Bio._utils import getattr_str, trim_str
 from collections import OrderedDict
@@ -17,7 +15,8 @@ from collections import OrderedDict
 #####
 DEFAULT_NAME = 'SCUBAT_v2.py'
 VERSION = 2.08
-DEFAULT_IDENTITY_CUTOFF = 95
+DEFAULT_TRANSCRIPT_IDENTITY_CUTOFF = 95
+DEFAULT_HSP_IDENTITY_CUTOFF = 95
 DEFAULT_EXON_OVERLAP_CUTOFF = 80
 DEFAULT_TRANSCRIPT_OVERLAP_CUTOFF = 50
 DEFAULT_LIBRARY_INSERT_SIZE = 100
@@ -28,8 +27,10 @@ DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG = 70
 parser = argparse.ArgumentParser(prog=DEFAULT_NAME,description='Scaffold contigs using Transcripts')
 parser.add_argument('-b','--blastfile', dest='blastfile',
                    help='BLAST output in xml format')
-parser.add_argument('-id','--identity_cutoff', type=int,
-                   help='BLAST identity cutoff [default: %(default)s]',default=DEFAULT_IDENTITY_CUTOFF)
+parser.add_argument('-tid','--transcript_identity_cutoff', type=int,
+                   help='BLAST transcript identity cutoff [default: %(default)s]',default=DEFAULT_TRANSCRIPT_IDENTITY_CUTOFF)
+parser.add_argument('-hid','--hsp_identity_cutoff', type=int,
+                   help='BLAST HSP identity cutoff [default: %(default)s]',default=DEFAULT_HSP_IDENTITY_CUTOFF)
 parser.add_argument('-eov','--exon_overlap_cutoff', type=int,
                    help='Exon overlap cutoff [default: %(default)s]',default=DEFAULT_EXON_OVERLAP_CUTOFF)                   
 parser.add_argument('-tov','--transcript_overlap_cutoff', type=int,
@@ -183,7 +184,6 @@ def removeOverlappingHsps( hit ):
 # (primarly to remove hits in a pseudogene/domain area in other contigs)
 ####
 def removeOverlappingHits (qresult):
-    #print >>debug, qresult.id #debuging
     sort_key = lambda hit: len(hit)
     qresult.sort(key=sort_key, reverse=True, in_place=True)
     k = 0
@@ -191,19 +191,13 @@ def removeOverlappingHits (qresult):
     while k < len(qresult) -1:
         x = range(qresult.hits[k].hsps[0].query_start,qresult.hits[k].hsps[-1].query_end)
         i = k + 1
-        #print >>debug, x #debuging
         done = 0
         while i < len(qresult) and done==0:
             y = range(qresult.hits[i].hsps[0].query_start,qresult.hits[i].hsps[-1].query_end)
             d = range(max(x[0], y[0])-1, min(x[-1], y[-1])+1)
             minimum_length = min(len(x),len(y))
             diff = float(len(d)) / (minimum_length+1)
-            #print >>debug, y #debuging
-            #print >>debug, d #debuging
-            #print >>debug, minimum_length #debuging
-            #print >>debug, diff #debuging
             if diff > round(float(args.transcript_overlap_cutoff)/100,2):
-                #print >>debug, 'INSIDE' #debuging
                 if len(x) < len(y):
                     remove_k = 1
                     done = 1
@@ -294,12 +288,15 @@ for qresult in SearchIO.parse(args.blastfile, 'blast-xml'):
             same_contig.append(qresult)
     else:
         transcript = Transcript(qresult.id,qresult.seq_len)
+        identity_number = 0
+        alignment_hsp = 0
         for hit in qresult:
             for hsp in hit:
-                identity = round(100*(float(hsp.ident_num)/hsp.aln_span),2)
-                #print >>debug, identity #debuging
-                if identity >= args.identity_cutoff:
-                    hsp_t = Hspg(hsp.evalue,hsp.bitscore,identity,hsp.aln_span,hsp.query_start,hsp.query_end,hsp.hit_start,hsp.hit_end,hit.id,hit.seq_len,hsp.hit_strand)
+                identity_hsp = round(100*(float(hsp.ident_num)/hsp.aln_span),2)
+                if identity_hsp >= args.hsp_identity_cutoff:
+                    identity_number += hsp.ident_num
+                    alignment_hsp += hsp.aln_span
+                    hsp_t = Hspg(hsp.evalue,hsp.bitscore,identity_hsp,hsp.aln_span,hsp.query_start,hsp.query_end,hsp.hit_start,hsp.hit_end,hit.id,hit.seq_len,hsp.hit_strand)
                     transcript.add(hsp_t)
         sort_key = lambda hsp: hsp.query_range
         transcript.sort(key=sort_key, reverse=False, in_place=True)
@@ -310,14 +307,20 @@ for qresult in SearchIO.parse(args.blastfile, 'blast-xml'):
             k += 1
         qcov = list(set(qcov))
         pers = round(100*(float(len(qcov))/transcript.query_length),2)
-        if (pers >= args.transcript_coverage_cutoff):
+        # Change to 1 in case of no hsps passing the identity filter
+        if alignment_hsp == 0:
+            alignment_hsp = 1
+        identity = round(100*(float(identity_number)/alignment_hsp),2)
+        if (pers >= args.transcript_coverage_cutoff and identity >= args.transcript_identity_cutoff):
             informative.append(transcript)
-            print >>qcovfile, transcript.query_id + '\t' + str(pers)
+            print >>qcovfile, transcript.query_id + '\t' + str(pers) + '\t' + str(identity)
         else:
-            print >>qcovfile, transcript.query_id + '\t' + str(pers) + '\t' + 'REMOVED'
+            print >>qcovfile, transcript.query_id + '\t' + str(pers) + '\t' + str(identity) + '\t' + 'REMOVED'
     n += 1
     disp_status("Processing BLAST xml...",n,number_of_hits)
 print ''
+
+qcovfile.close()
 
 #####
 # Calculate stats for intron sizes and exon overlaps
@@ -341,6 +344,9 @@ for qresult in same_contig:
     n += 1
     disp_status("Calculating stats...",n,len(same_contig))    
 print ''
+
+f.close()
+h.close()
 
 #####
 # Calculate maximum intron size based on the data
@@ -401,6 +407,10 @@ for transcript in informative:
 
 print ''
 
+e.close()
+p.close()
+v.close()
+c.close()
 
 transcripts_passed = 0
 transcripts_failed = 0
@@ -426,6 +436,8 @@ connections = list(set(connections))
 
 for conn in connections:
     print >>all_connections, conn
+
+all_connections.close()
     
 precs=[]
 sucs=[]
@@ -460,6 +472,7 @@ for conn in connections:
         start_nodes.add(pre)
         start_nodes.add(suc)
 
+tr.close()
 start_nodes -= set(nodes.values())
 
 def getPath(nodes, start):
@@ -473,51 +486,7 @@ for start_node in start_nodes:
     path = getPath(nodes, start_node)
     print >>confiledict, path
 
-#original networkx implementation
-'''
-#NXCode
-DG=nx.DiGraph()
-G=nx.Graph()
-#NXCodeEND
-
-
-for conn in connections:
-    pre,suc=conn.split('\t')
-    if (pre in precs_duplicates or suc in sucs_duplicates):
-        print >>tr, conn
-    else:
-        print >>confile, conn + '\t' + str("1") + '\t' + str("500")
-        #NXCode
-        DG.add_edge(pre,suc)
-        G.add_edge(pre,suc)
-        #NXCodeEND
-    
-#NXCode
-start = time.time()
-
-start_nodes=[]
-end_nodes=[]
-
-for node in DG.nodes():
-    indegree = DG.in_degree(node)
-    outdegree = DG.out_degree(node)
-    if outdegree == 1 and indegree == 0:
-        start_nodes.append(node)
-    elif outdegree == 0 and indegree == 1:
-        end_nodes.append(node)
-
-start_nodes=set(start_nodes)
-end_nodes=set(end_nodes)
-
-for path in nx.connected_components(G):
-    for node in path:
-        if node in start_nodes:
-            start_node=node
-        elif node in end_nodes:
-            end_node=node
-    final_path=shortest_path(DG, start_node, end_node)
-    print >>confiledict, final_path
-'''
+confiledict.close()
 
 end = time.time()
 seconds = round((end - start),3)
@@ -525,7 +494,7 @@ minutes = round((seconds/60),3)
 print ''
 print str(minutes)
 print ''
-#NXCodeEND
+
 
 
 transcripts_passed_number =  len(uninformative) + len(same_contig) + transcripts_passed
@@ -534,7 +503,8 @@ transcripts_passed_number =  len(uninformative) + len(same_contig) + transcripts
 s.write('Program was called as:' + '\n')
 s.write(DEFAULT_NAME + '\n')
 s.write(' -b ' + '\t' + args.blastfile + '\n')
-s.write(' -id ' + '\t' + str(args.identity_cutoff) + '\n')
+s.write(' -tid ' + '\t' + str(args.transcript_identity_cutoff) + '\n')
+s.write(' -hid ' + '\t' + str(args.hsp_identity_cutoff) + '\n')
 s.write(' -eov ' + '\t' + str(args.exon_overlap_cutoff) + '\n')
 s.write(' -tov ' + '\t' + str(args.transcript_overlap_cutoff) + '\n')
 s.write(' -lis ' + '\t' + str(args.library_insert_size) + '\n')
@@ -554,6 +524,8 @@ s.write('Transcripts with no hits:' + str(len(no_hit)) + '\n')
 s.write('Transcripts more than ' + str(DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG) + ' in one contig:' + str(transcripts_passed_number) + '\n')
 s.write('Transcripts less than ' + str(DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG) + ' in one contig:' + str(transcripts_failed) + '\n')
 
+
+s.close()
 #####
 # Ending prints
 #####
