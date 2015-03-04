@@ -6,7 +6,10 @@ import argparse
 import numpy
 import time
 import subprocess
+from string import maketrans
 from Bio import SearchIO
+from Bio import SeqIO
+from Bio.Seq import Seq
 from Bio._utils import getattr_str, trim_str
 from collections import OrderedDict
 
@@ -27,6 +30,8 @@ DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG = 70
 parser = argparse.ArgumentParser(prog=DEFAULT_NAME,description='Scaffold contigs using Transcripts')
 parser.add_argument('-b','--blastfile', dest='blastfile',
                    help='BLAST output in xml format')
+parser.add_argument('-f','--fastafile', dest='fastafile',
+                   help='Contig assembly in fasta format')
 parser.add_argument('-tid','--transcript_identity_cutoff', type=int,
                    help='BLAST transcript identity cutoff [default: %(default)s]',default=DEFAULT_TRANSCRIPT_IDENTITY_CUTOFF)
 parser.add_argument('-hid','--hsp_identity_cutoff', type=int,
@@ -239,6 +244,15 @@ def propable_intron_size(hit_start_first,hit_end_first,orientation_first,contig_
         p_intron_size = hit_start_first + hit_start_second
     return p_intron_size    
 
+####
+# create the path
+####
+def getPath(nodes, start):
+    path = [start]
+    while nodes.has_key(path[-1]):
+        path.append(nodes[path[-1]])
+
+    return path
     
 #####
 # Begin
@@ -256,6 +270,7 @@ s = open('SCUBAT_stats', 'w')
 v = open('Cyto_table_verbose.sif', 'w')
 p = open('prob_intron', 'w')
 c = open('connection_removed', 'w')
+scaffold_file = open('SCUBAT_scaffolds.fasta', 'w')
 confile = open('final.connections.txt', 'w')
 confiledict = open('connections.dict.txt', 'w')
 tr = open('toremove.dict.txt', 'w')
@@ -459,9 +474,10 @@ for trm in sucs_duplicates:
 
 print >>tr, "#connections removed"
 
-start = time.time()
 nodes = {}
 start_nodes = set()
+all_nodes = set()
+
 
 for conn in connections:
     pre,suc = conn.split('\t')
@@ -470,31 +486,51 @@ for conn in connections:
     else:
         nodes[pre] = suc
         start_nodes.add(pre)
-        start_nodes.add(suc)
+        all_nodes.add(pre[:-2])
+        all_nodes.add(suc[:-2])
+
 
 tr.close()
 start_nodes -= set(nodes.values())
 
-def getPath(nodes, start):
-    path = [start]
-    while nodes.has_key(path[-1]):
-        path.append(nodes[path[-1]])
+paths = []
+contigs = {}
 
-    return path
+for record in SeqIO.parse(args.fastafile, "fasta") :
+    contigs[record.id] = record.seq.tostring()
+
+i = 0;
+string_of_ns="NNNNNNNNNXNNNNNNNNNN"
 
 for start_node in start_nodes:
-    path = getPath(nodes, start_node)
-    print >>confiledict, path
+    path=getPath(nodes, start_node)
+    if path[0] > path[-1]:
+        i += 1    
+        print >>confiledict, path
+        scaffold_file.write('>Path_' + str(i) + '\n')
+        for node in path:
+            node_id = node[:-2]
+            orientation = node[-2:]
+            if orientation == "/f":
+                scaffold_file.write(contigs[node_id])
+            elif orientation == "/r":
+                seq=Seq(contigs[node_id])
+                scaffold_file.write(str(seq.reverse_complement()))
+            if node == path[-1]:
+                scaffold_file.write('\n')
+            else:
+                scaffold_file.write(string_of_ns)
+
+
+
+for contig_id in contigs.keys():
+    if contig_id not in all_nodes:
+        scaffold_file.write('>' + contig_id + '\n' + contigs[contig_id] + '\n')
 
 confiledict.close()
+scaffold_file.close()
 
-end = time.time()
-seconds = round((end - start),3)
-minutes = round((seconds/60),3)
-print ''
-print str(minutes)
-print ''
-
+# END OF SCAFFOLDING
 
 
 transcripts_passed_number =  len(uninformative) + len(same_contig) + transcripts_passed
