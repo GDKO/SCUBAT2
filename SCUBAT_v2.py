@@ -48,7 +48,7 @@ parser.add_argument('-tov','--transcript_overlap_cutoff', type=int,
 parser.add_argument('-lis','--library_insert_size', type=int,
                    help='Library insert size [default: %(default)s]',default=DEFAULT_LIBRARY_INSERT_SIZE)
 parser.add_argument('-ns','--number_of_ns', type=int,
-                   help='Number of Ns between contigs during merging [default: %(default)s]',default=DEFAULT_NUMBER_OF_NS)
+                   help='Number of Ns to add when merging [default: %(default)s]',default=DEFAULT_NUMBER_OF_NS)
 
                    
 
@@ -373,9 +373,9 @@ h.close()
 
 if (args.maximum_intron_size == 0):
     intron_sizes_filtered = [i for i in intron_sizes if i>args.library_insert_size]    
-    l95 = int(round(len(intron_sizes_filtered)*0.99))
+    l99 = int(round(len(intron_sizes_filtered)*0.99))
     intron_sizes_filtered.sort()
-    args.maximum_intron_size = intron_sizes_filtered[l95]
+    args.maximum_intron_size = intron_sizes_filtered[l99]
 
 
 #####
