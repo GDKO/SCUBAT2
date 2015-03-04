@@ -447,6 +447,34 @@ for trm in sucs_duplicates:
 
 print >>tr, "#connections removed"
 
+start = time.time()
+nodes = {}
+start_nodes = set()
+
+for conn in connections:
+    pre,suc = conn.split('\t')
+    if (pre in precs_duplicates or suc in sucs_duplicates):
+        print >>tr, conn
+    else:
+        nodes[pre] = suc
+        start_nodes.add(pre)
+        start_nodes.add(suc)
+
+start_nodes -= set(nodes.values())
+
+def getPath(nodes, start):
+    path = [start]
+    while nodes.has_key(path[-1]):
+        path.append(nodes[path[-1]])
+
+    return path
+
+for start_node in start_nodes:
+    path = getPath(nodes, start_node)
+    print >>confiledict, path
+
+#original networkx implementation
+'''
 #NXCode
 DG=nx.DiGraph()
 G=nx.Graph()
@@ -489,10 +517,7 @@ for path in nx.connected_components(G):
             end_node=node
     final_path=shortest_path(DG, start_node, end_node)
     print >>confiledict, final_path
-
-
-
-
+'''
 
 end = time.time()
 seconds = round((end - start),3)
