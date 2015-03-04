@@ -17,7 +17,7 @@ from collections import OrderedDict
 # Parameters
 #####
 DEFAULT_NAME = 'SCUBAT_v2.py'
-VERSION = 2.08
+VERSION = 2.09
 DEFAULT_TRANSCRIPT_IDENTITY_CUTOFF = 95
 DEFAULT_HSP_IDENTITY_CUTOFF = 95
 DEFAULT_EXON_OVERLAP_CUTOFF = 80
@@ -26,26 +26,30 @@ DEFAULT_LIBRARY_INSERT_SIZE = 100
 DEFAULT_MAXIMUM_INTRON_SIZE = 0
 DEFAULT_TRANSCRIPT_COVERAGE_CUTOFF = 90
 DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG = 70
+DEFAULT_NUMBER_OF_NS = 100
 
 parser = argparse.ArgumentParser(prog=DEFAULT_NAME,description='Scaffold contigs using Transcripts')
-parser.add_argument('-b','--blastfile', dest='blastfile',
+parser.add_argument('-b','--blastfile', dest='blastfile', required=True,
                    help='BLAST output in xml format')
-parser.add_argument('-f','--fastafile', dest='fastafile',
+parser.add_argument('-f','--fastafile', dest='fastafile', required=True,
                    help='Contig assembly in fasta format')
-parser.add_argument('-tid','--transcript_identity_cutoff', type=int,
-                   help='BLAST transcript identity cutoff [default: %(default)s]',default=DEFAULT_TRANSCRIPT_IDENTITY_CUTOFF)
 parser.add_argument('-hid','--hsp_identity_cutoff', type=int,
                    help='BLAST HSP identity cutoff [default: %(default)s]',default=DEFAULT_HSP_IDENTITY_CUTOFF)
+parser.add_argument('-tid','--transcript_identity_cutoff', type=int,
+                   help='BLAST transcript identity cutoff [default: %(default)s]',default=DEFAULT_TRANSCRIPT_IDENTITY_CUTOFF)
+parser.add_argument('-tcov','--transcript_coverage_cutoff', type=int,
+                   help='Transcript coverage cutoff [default: %(default)s]',default=DEFAULT_TRANSCRIPT_COVERAGE_CUTOFF)
+parser.add_argument('-max','--maximum_intron_size', type=int,
+                   help='Maximum intron size [default: automatic calculation (experimental)]',default=DEFAULT_MAXIMUM_INTRON_SIZE)
 parser.add_argument('-eov','--exon_overlap_cutoff', type=int,
                    help='Exon overlap cutoff [default: %(default)s]',default=DEFAULT_EXON_OVERLAP_CUTOFF)                   
 parser.add_argument('-tov','--transcript_overlap_cutoff', type=int,
                    help='Transcript overlap cutoff [default: %(default)s]',default=DEFAULT_TRANSCRIPT_OVERLAP_CUTOFF)
 parser.add_argument('-lis','--library_insert_size', type=int,
                    help='Library insert size [default: %(default)s]',default=DEFAULT_LIBRARY_INSERT_SIZE)
-parser.add_argument('-max','--maximum_intron_size', type=int,
-                   help='Maximum intron size [default: automatic calculation (experimental)]',default=DEFAULT_MAXIMUM_INTRON_SIZE)
-parser.add_argument('-tcov','--transcript_coverage_cutoff', type=int,
-                   help='Transcript coverage cutoff [default: %(default)s]',default=DEFAULT_TRANSCRIPT_COVERAGE_CUTOFF)
+parser.add_argument('-ns','--number_of_ns', type=int,
+                   help='Number of Ns between contigs during merging [default: %(default)s]',default=DEFAULT_NUMBER_OF_NS)
+
                    
 
 parser.add_argument('--version', action='version', version='%(prog)s v' + str(VERSION))
@@ -500,8 +504,12 @@ for record in SeqIO.parse(args.fastafile, "fasta") :
     contigs[record.id] = record.seq.tostring()
 
 i = 0;
-string_of_ns="NNNNNNNNNXNNNNNNNNNN"
+string_of_ns = ""
+while (i < args.number_of_ns):
+    string_of_ns = string_of_ns + "N"
+    i += 1
 
+i = 0;
 for start_node in start_nodes:
     path=getPath(nodes, start_node)
     if path[0] > path[-1]:
