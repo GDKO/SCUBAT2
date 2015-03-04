@@ -460,9 +460,7 @@ for conn in connections:
         start_nodes.add(pre)
         start_nodes.add(suc)
 
-for sucs in nodes.values():
-    if sucs in start_nodes:
-        start_nodes.remove(sucs)
+start_nodes -= set(nodes.values())
 
 def getPath(nodes, start):
     path = [start]
