@@ -33,6 +33,8 @@ parser.add_argument('-b','--blastfile', dest='blastfile', required=True,
                    help='BLAST output in xml format')
 parser.add_argument('-f','--fastafile', dest='fastafile', required=True,
                    help='Contig assembly in fasta format')
+parser.add_argument('-lrna','--lrnafile', dest='lrnafile',
+                   help='final.path file from L_RNA_scaffolder')
 parser.add_argument('-hid','--hsp_identity_cutoff', type=int,
                    help='BLAST HSP identity cutoff [default: %(default)s]',default=DEFAULT_HSP_IDENTITY_CUTOFF)
 parser.add_argument('-tid','--transcript_identity_cutoff', type=int,
@@ -290,7 +292,7 @@ confiledict = open('connections.dict.txt', 'w')
 tr = open('toremove.dict.txt', 'w')
 qcovfile = open('qcov.txt', 'w')
 all_connections = open('all_connections.txt', 'w')
-#debug = open('debug.txt', 'w')
+debug = open('debug.txt', 'w')
 
 
 ####
@@ -504,6 +506,13 @@ for conn in connections:
         all_nodes.add(suc[:-2])
 
 
+if args.lrnafile is not None:
+    lrna_list = [re.split('->N\(\d*\)->', line.rstrip('\n')) for line in open(args.lrnafile)]
+    print >>debug, lrna_list[0]
+    print >>debug, lrna_list[1]
+
+
+
 tr.close()
 start_nodes -= set(nodes.values())
 
@@ -557,9 +566,9 @@ s.write('Transcripts with no hits:' + str(len(no_hit))  + '\n')
 s.write('Transcripts with 1 hsp:' + str(len(uninformative)) + '\n')
 s.write('Transcripts hitting 1 contig with multiple hsps:'  + str(len(same_contig)) + '\n')
 s.write('Transcripts hitting multiple contigs:'             + str(len(informative)) + '\n')
-s.write('Intron_size Mean:'  + str(numpy.array(intron_sizes).mean(axis=0))  + '\t' + 'Median:' + str(numpy.median(numpy.array(intron_sizes), axis=0))  + '\t' + 'SD:' + str(numpy.array(intron_sizes).std(axis=0))  + '\n')
-s.write('Exon_Overlap Mean:' + str(numpy.array(exon_overlaps).mean(axis=0)) + '\t' + 'Median:' + str(numpy.median(numpy.array(exon_overlaps), axis=0)) + '\t' + 'SD:' + str(numpy.array(exon_overlaps).std(axis=0)) + '\n')
-s.write('Connections removed based on max intron size:' + str(conn_removed) + '\n')
+s.write('Intron_size Mean:'  + str(numpy.array(intron_sizes).mean(axis=0))   + '\t' + 'Median:' + str(numpy.median(numpy.array(intron_sizes), axis=0))  + '\t' + 'SD:' + str(numpy.array(intron_sizes).std(axis=0))  + '\n')
+s.write('Exon_Overlap Mean:' + str(numpy.array(exon_overlaps).mean(axis=0))  + '\t' + 'Median:' + str(numpy.median(numpy.array(exon_overlaps), axis=0)) + '\t' + 'SD:' + str(numpy.array(exon_overlaps).std(axis=0)) + '\n')
+s.write('Connections removed based on max intron size:' + str(conn_removed)  + '\n')
 s.write('---------------------------------------------' + '\n')
 s.write('---------------------------------------------' + '\n')
 s.write('Transcripts with no hits:' + str(len(no_hit))  + '\n')
