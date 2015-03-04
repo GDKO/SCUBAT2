@@ -503,11 +503,9 @@ contigs = {}
 for record in SeqIO.parse(args.fastafile, "fasta") :
     contigs[record.id] = record.seq.tostring()
 
-i = 0;
-string_of_ns = ""
-while (i < args.number_of_ns):
-    string_of_ns = string_of_ns + "N"
-    i += 1
+
+string_of_ns = "N" * args.number_of_ns
+
 
 i = 0;
 for start_node in start_nodes:
@@ -522,8 +520,7 @@ for start_node in start_nodes:
             if orientation == "/f":
                 scaffold_file.write(contigs[node_id])
             elif orientation == "/r":
-                seq=Seq(contigs[node_id])
-                scaffold_file.write(str(seq.reverse_complement()))
+                scaffold_file.write(str(Seq(contigs[node_id]).reverse_complement()))
             if node == path[-1]:
                 scaffold_file.write('\n')
             else:
