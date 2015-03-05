@@ -23,16 +23,15 @@ DEFAULT_HSP_IDENTITY_CUTOFF = 95
 DEFAULT_EXON_OVERLAP_CUTOFF = 80
 DEFAULT_TRANSCRIPT_OVERLAP_CUTOFF = 50
 DEFAULT_LIBRARY_INSERT_SIZE = 100
-DEFAULT_MAXIMUM_INTRON_SIZE = 0
 DEFAULT_TRANSCRIPT_COVERAGE_CUTOFF = 90
 DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG = 70
 DEFAULT_NUMBER_OF_NS = 100
 
 parser = argparse.ArgumentParser(prog=DEFAULT_NAME,description='Scaffold contigs using Transcripts')
 parser.add_argument('-b','--blastfile', dest='blastfile', required=True,
-                   help='BLAST output in xml format')
+                   help='BLAST output in xml format [Required]')
 parser.add_argument('-f','--fastafile', dest='fastafile', required=True,
-                   help='Contig assembly in fasta format')
+                   help='Contig assembly in fasta format [Required]')
 parser.add_argument('-lrna','--lrnafile', dest='lrnafile',
                    help='final.path file from L_RNA_scaffolder')
 parser.add_argument('-hid','--hsp_identity_cutoff', type=int,
@@ -41,8 +40,8 @@ parser.add_argument('-tid','--transcript_identity_cutoff', type=int,
                    help='BLAST transcript identity cutoff [default: %(default)s]',default=DEFAULT_TRANSCRIPT_IDENTITY_CUTOFF)
 parser.add_argument('-tcov','--transcript_coverage_cutoff', type=int,
                    help='Transcript coverage cutoff [default: %(default)s]',default=DEFAULT_TRANSCRIPT_COVERAGE_CUTOFF)
-parser.add_argument('-max','--maximum_intron_size', type=int,
-                   help='Maximum intron size [default: automatic calculation (experimental)]',default=DEFAULT_MAXIMUM_INTRON_SIZE)
+parser.add_argument('-max','--maximum_intron_size', type=int, required=True,
+                   help='Maximum intron size [Required]')
 parser.add_argument('-eov','--exon_overlap_cutoff', type=int,
                    help='Exon overlap cutoff [default: %(default)s]',default=DEFAULT_EXON_OVERLAP_CUTOFF)                   
 parser.add_argument('-tov','--transcript_overlap_cutoff', type=int,
@@ -51,10 +50,12 @@ parser.add_argument('-lis','--library_insert_size', type=int,
                    help='Library insert size [default: %(default)s]',default=DEFAULT_LIBRARY_INSERT_SIZE)
 parser.add_argument('-ns','--number_of_ns', type=int,
                    help='Number of Ns to add when merging [default: %(default)s]',default=DEFAULT_NUMBER_OF_NS)
-
-                   
-
+parser.add_argument('-isr','--intron_size_run', dest='intron_size_run', action='store_true',
+                   help='Estimate insert size based on the data')
 parser.add_argument('--version', action='version', version='%(prog)s v' + str(VERSION))
+
+parser.set_defaults(intron_size_run=False)
+
 if len(sys.argv)==1:
     parser.print_help()
     sys.exit(1)
@@ -279,20 +280,22 @@ start = time.time()
 number_of_hits =subprocess.check_output(['grep','-c', '<Iteration>', args.blastfile])
 
 #open the files for testing
-f = open('exon_overlap', 'w')
+
 h = open('intron_size', 'w')
-e = open('exon_filter', 'w')
-s = open('SCUBAT_stats', 'w')
-v = open('Cyto_table_verbose.sif', 'w')
-p = open('prob_intron', 'w')
-c = open('connection_removed', 'w')
-scaffold_file = open('SCUBAT_scaffolds.fasta', 'w')
-confile = open('final.connections.txt', 'w')
-confiledict = open('connections.dict.txt', 'w')
-tr = open('toremove.dict.txt', 'w')
-qcovfile = open('qcov.txt', 'w')
-all_connections = open('all_connections.txt', 'w')
-debug = open('debug.txt', 'w')
+
+if not args.intron_size_run:
+    e = open('exon_filter', 'w')
+    s = open('SCUBAT_stats', 'w')
+    v = open('Cyto_table_verbose.sif', 'w')
+    p = open('prob_intron', 'w')
+    c = open('connection_removed', 'w')
+    scaffold_file = open('SCUBAT_scaffolds.fasta', 'w')
+    confile = open('final.connections.txt', 'w')
+    confiledict = open('connections.dict.txt', 'w')
+    tr = open('toremove.dict.txt', 'w')
+    qcovfile = open('qcov.txt', 'w')
+    all_connections = open('all_connections.txt', 'w')
+    debug = open('debug.txt', 'w')
 
 
 ####
@@ -344,14 +347,17 @@ for qresult in SearchIO.parse(args.blastfile, 'blast-xml'):
         identity = round(100*(float(identity_number)/alignment_hsp),2)
         if (pers >= args.transcript_coverage_cutoff and identity >= args.transcript_identity_cutoff):
             informative.append(transcript)
-            print >>qcovfile, transcript.query_id + '\t' + str(pers) + '\t' + str(identity)
+            if not args.intron_size_run:
+                print >>qcovfile, transcript.query_id + '\t' + str(pers) + '\t' + str(identity)
         else:
-            print >>qcovfile, transcript.query_id + '\t' + str(pers) + '\t' + str(identity) + '\t' + 'REMOVED'
+            if not args.intron_size_run:
+                print >>qcovfile, transcript.query_id + '\t' + str(pers) + '\t' + str(identity) + '\t' + 'REMOVED'
     n += 1
     disp_status("Processing BLAST xml...",n,number_of_hits)
 print ''
 
-qcovfile.close()
+if not args.intron_size_run:
+    qcovfile.close()
 
 #####
 # Calculate stats for intron sizes and exon overlaps
@@ -367,7 +373,6 @@ for qresult in same_contig:
             if (hit.hsps[k+1].query_start-hit.hsps[k].query_end)<1:
                 overlap_diff = abs(hit.hsps[k+1].query_start-hit.hsps[k].query_end)+1
                 exon_overlaps.append(overlap_diff)
-                f.write(str(overlap_diff)+ '\t' + hit.query_id + '\n')
             intron_size = abs(hit.hsps[k+1].hit_start-hit.hsps[k].hit_end)+1
             intron_sizes.append(intron_size)
             h.write(str(intron_size)+ '\t' + hit.query_id +'\n')
@@ -376,18 +381,8 @@ for qresult in same_contig:
     disp_status("Calculating stats...",n,len(same_contig))    
 print ''
 
-f.close()
-h.close()
 
-#####
-# Calculate maximum intron size based on the data
-#####
-
-if (args.maximum_intron_size == 0):
-    intron_sizes_filtered = [i for i in intron_sizes if i>args.library_insert_size]    
-    l99 = int(round(len(intron_sizes_filtered)*0.99))
-    intron_sizes_filtered.sort()
-    args.maximum_intron_size = intron_sizes_filtered[l99]
+#h.close()
 
 
 #####
@@ -402,9 +397,14 @@ to_remove=[]
 
 for transcript in informative:
     k=0
-    print >>e, transcript
+    if not args.intron_size_run:
+        print >>e, transcript
     while k < len(transcript.hsps) -1:
-        if not (transcript.hsps[k].hit_id == transcript.hsps[k+1].hit_id):
+        if (transcript.hsps[k].hit_id == transcript.hsps[k+1].hit_id):
+            intron_size = abs(transcript.hsps[k+1].hit_start-transcript.hsps[k].hit_end)+1
+            intron_sizes.append(intron_size)
+            h.write(str(intron_size)+ '\t' + hit.query_id +'\n')
+        else:
             if (transcript.hsps[k].strand == 1 or transcript.hsps[k].strand == '+'):
                 transcript.hsps[k].strand='+'
             else:
@@ -413,30 +413,35 @@ for transcript in informative:
                 transcript.hsps[k+1].strand='+'
             else:
                 transcript.hsps[k+1].strand='-'
-            p_intron = propable_intron_size(transcript.hsps[k].hit_start,transcript.hsps[k].hit_end,transcript.hsps[k].strand,transcript.hsps[k].hit_length,transcript.hsps[k+1].hit_start,transcript.hsps[k+1].hit_end,transcript.hsps[k+1].strand,transcript.hsps[k+1].hit_length)
-            p.write(str(p_intron) + '\t' + transcript.query_id + '\n')
-            if ((p_intron+args.library_insert_size) < args.maximum_intron_size):
-                v.write(transcript.hsps[k].hit_id + '\t' + transcript.query_id + '\t' + transcript.hsps[k+1].hit_id + '\t' + transcript.hsps[k].strand + transcript.hsps[k+1].strand+ '\n')
-                if (transcript.hsps[k].strand == "+" and transcript.hsps[k+1].strand == "+"):
-                    connections.append(transcript.hsps[k].hit_id + '/f' + '\t' + transcript.hsps[k+1].hit_id + '/f')
-                    connections.append(transcript.hsps[k+1].hit_id + '/r' + '\t' + transcript.hsps[k].hit_id + '/r')
-                elif (transcript.hsps[k].strand == "+" and transcript.hsps[k+1].strand == "-"):
-                    connections.append(transcript.hsps[k].hit_id + '/f' + '\t' + transcript.hsps[k+1].hit_id + '/r')
-                    connections.append(transcript.hsps[k+1].hit_id + '/f' + '\t' + transcript.hsps[k].hit_id + '/r')
-                elif (transcript.hsps[k].strand == "-" and transcript.hsps[k+1].strand == "+"):
-                    connections.append(transcript.hsps[k].hit_id + '/r' + '\t' + transcript.hsps[k+1].hit_id + '/f')
-                    connections.append(transcript.hsps[k+1].hit_id + '/r' + '\t' + transcript.hsps[k].hit_id + '/f')
+            if not args.intron_size_run:    
+                p_intron = propable_intron_size(transcript.hsps[k].hit_start,transcript.hsps[k].hit_end,transcript.hsps[k].strand,transcript.hsps[k].hit_length,transcript.hsps[k+1].hit_start,transcript.hsps[k+1].hit_end,transcript.hsps[k+1].strand,transcript.hsps[k+1].hit_length)
+                p.write(str(p_intron) + '\t' + transcript.query_id + '\n')
+                if ((p_intron+args.library_insert_size) < args.maximum_intron_size):
+                    v.write(transcript.hsps[k].hit_id + '\t' + transcript.query_id + '\t' + transcript.hsps[k+1].hit_id + '\t' + transcript.hsps[k].strand + transcript.hsps[k+1].strand+ '\n')
+                    if (transcript.hsps[k].strand == "+" and transcript.hsps[k+1].strand == "+"):
+                        connections.append(transcript.hsps[k].hit_id + '/f' + '\t' + transcript.hsps[k+1].hit_id + '/f')
+                        connections.append(transcript.hsps[k+1].hit_id + '/r' + '\t' + transcript.hsps[k].hit_id + '/r')
+                    elif (transcript.hsps[k].strand == "+" and transcript.hsps[k+1].strand == "-"):
+                        connections.append(transcript.hsps[k].hit_id + '/f' + '\t' + transcript.hsps[k+1].hit_id + '/r')
+                        connections.append(transcript.hsps[k+1].hit_id + '/f' + '\t' + transcript.hsps[k].hit_id + '/r')
+                    elif (transcript.hsps[k].strand == "-" and transcript.hsps[k+1].strand == "+"):
+                        connections.append(transcript.hsps[k].hit_id + '/r' + '\t' + transcript.hsps[k+1].hit_id + '/f')
+                        connections.append(transcript.hsps[k+1].hit_id + '/r' + '\t' + transcript.hsps[k].hit_id + '/f')
+                    else:
+                        connections.append(transcript.hsps[k].hit_id + '/r' + '\t' + transcript.hsps[k+1].hit_id + '/r')
+                        connections.append(transcript.hsps[k+1].hit_id + '/f' + '\t' + transcript.hsps[k].hit_id + '/f')                  
                 else:
-                    connections.append(transcript.hsps[k].hit_id + '/r' + '\t' + transcript.hsps[k+1].hit_id + '/r')
-                    connections.append(transcript.hsps[k+1].hit_id + '/f' + '\t' + transcript.hsps[k].hit_id + '/f')                  
-            else:
-                c.write(transcript.hsps[k].hit_id + '\t' + transcript.query_id + '\t' + transcript.hsps[k+1].hit_id + '\t' + str(p_intron) + '\n')
-                conn_removed += 1
+                    c.write(transcript.hsps[k].hit_id + '\t' + transcript.query_id + '\t' + transcript.hsps[k+1].hit_id + '\t' + str(p_intron) + '\n')
+                    conn_removed += 1
         k += 1
     n += 1
     disp_status("Creating connections...",n,len(informative))
 
 print ''
+
+
+if args.intron_size_run:
+    sys.exit()
 
 e.close()
 p.close()
