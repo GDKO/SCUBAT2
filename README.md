@@ -8,6 +8,7 @@ Requirements
 ------------
 ###Python Libraries 
 [Biopython](http://biopython.org/wiki/Main_Page) - to parse BLAST XML file
+
 [Numpy](http://www.numpy.org/) - to calculate some statistics
 
 Details
