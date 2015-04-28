@@ -296,6 +296,7 @@ if not args.intron_size_run:
     qcovfile = open('qcov.txt', 'w')
     all_connections = open('all_connections.txt', 'w')
     debug = open('debug.txt', 'w')
+    unmapped_transcripts_file = open('unmapped_transcripts.txt', 'w')
 
 
 ####
@@ -315,6 +316,7 @@ for qresult in SearchIO.parse(args.blastfile, 'blast-xml'):
     removeOverlappingHits(qresult)
     if len(qresult.hits) == 0:
         no_hit.append(qresult)
+        print >>unmapped_transcripts_file, qresult.id
     elif len(qresult.hits) == 1:
         if len(hit.hsps) == 1:
             uninformative.append(qresult)
@@ -447,6 +449,7 @@ e.close()
 p.close()
 v.close()
 c.close()
+unmapped_transcripts_file.close()
 
 transcripts_passed = 0
 transcripts_failed = 0
@@ -537,7 +540,7 @@ for start_node in start_nodes:
     if path[0] > path[-1]:
         i += 1    
         print >>confiledict, path
-        scaffold_file.write('>Path_' + str(i) + '\n' + string_of_ns.join([getContig(contigs,node) for node in path]) + '\n')
+        scaffold_file.write('>Path_' + str(i) +'_' + path + '\n' + string_of_ns.join([getContig(contigs,node) for node in path]) + '\n')
 
 
 for contig_id in contigs.keys():
