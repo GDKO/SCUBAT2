@@ -540,7 +540,7 @@ for start_node in start_nodes:
     if path[0] > path[-1]:
         i += 1    
         print >>confiledict, path
-        scaffold_file.write('>Path_' + str(i) +'_' + path + '\n' + string_of_ns.join([getContig(contigs,node) for node in path]) + '\n')
+        scaffold_file.write('>Path_' + str(i) +'_' + str(path) + '\n' + string_of_ns.join([getContig(contigs,node) for node in path]) + '\n')
 
 
 for contig_id in contigs.keys():
