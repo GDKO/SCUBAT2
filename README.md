@@ -13,6 +13,10 @@ Requirements
 
 Details
 ------------
-Requiries a BLAST XML file i.e
+Requires a BLAST XML file
+
 ```blastn -query transcripts.fa -db contigs.fa -evalue 1e-25 -outfmt 5 -out blast.xml```
 
+For the same species the default settings for identity cutoff should be ideal
+
+The user must specify the max allowed intron size (i.e for nematode species ~ 20000 bp). Alternatively the user can run the program with ```--intron_size_run``` that creates the file intron_size which has the intron sizes calculated by the mapped transcripts
