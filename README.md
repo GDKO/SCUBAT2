@@ -13,4 +13,6 @@ Requirements
 
 Details
 ------------
-Still in testing phase.
+Requiries a BLAST XML file i.e
+```blastn -query transcripts.fa -db contigs.fa -evalue 1e-25 -outfmt 5 -out blast.xml```
+
