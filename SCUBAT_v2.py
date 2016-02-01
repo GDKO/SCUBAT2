@@ -17,7 +17,7 @@ from collections import OrderedDict
 # Parameters
 #####
 DEFAULT_NAME = 'SCUBAT_v2.py'
-VERSION = 2.09
+VERSION = 2.10
 DEFAULT_TRANSCRIPT_IDENTITY_CUTOFF = 95
 DEFAULT_HSP_IDENTITY_CUTOFF = 95
 DEFAULT_EXON_OVERLAP_CUTOFF = 80
@@ -307,6 +307,8 @@ uninformative = []
 informative = []
 same_contig = []
 n = 0
+contig_check_inner = {};
+contig_check_outer = {};
 
 
 
@@ -322,6 +324,25 @@ for qresult in SearchIO.parse(args.blastfile, 'blast-xml'):
             uninformative.append(qresult)
         else:    
             same_contig.append(qresult)
+
+        if (hit.hsps[0].hit_start < hit.hsps[-1].hit_end):
+            debug.write(hit.id + '\t' + str(hit.hsps[0].hit_start) + '\t' + str(hit.hsps[-1].hit_end) + '\n')
+            contig_check_start = hit.hsps[0].hit_start
+            contig_check_end   = hit.hsps[-1].hit_end
+        else:
+            debug.write(hit.id + '\t' + str(hit.hsps[-1].hit_start) + '\t' + str(hit.hsps[0].hit_end) + '\n')
+            contig_check_start = hit.hsps[-1].hit_start
+            contig_check_end   = hit.hsps[0].hit_end
+        if hit.id in contig_check_inner:
+            if contig_check_start < contig_check_inner[hit.id]:
+                contig_check_inner[hit.id] = contig_check_end
+            elif contig_check_end > contig_check_outer[hit.id]:
+                contig_check_outer[hit.id] = contig_check_start
+            else:
+                pass
+        else:               
+            contig_check_inner[hit.id] = contig_check_end
+            contig_check_outer[hit.id] = contig_check_start
     else:
         transcript = Transcript(qresult.id,qresult.seq_len)
         identity_number = 0
@@ -361,6 +382,10 @@ print ''
 if not args.intron_size_run:
     qcovfile.close()
 
+
+print >>debug, contig_check_inner
+print >>debug, contig_check_outer
+
 #####
 # Calculate stats for intron sizes and exon overlaps
 #####
@@ -397,28 +422,55 @@ connections=[]
 connections_dict={}
 to_remove=[]
 
+
 for transcript in informative:
     k=0
     if not args.intron_size_run:
         print >>e, transcript
     while k < len(transcript.hsps) -1:
+        flag=1
         if (transcript.hsps[k].hit_id == transcript.hsps[k+1].hit_id):
             intron_size = abs(transcript.hsps[k+1].hit_start-transcript.hsps[k].hit_end)+1
             intron_sizes.append(intron_size)
             h.write(str(intron_size)+ '\t' + hit.query_id +'\n')
         else:
+            debug.write(transcript.query_id + '\n')
             if (transcript.hsps[k].strand == 1 or transcript.hsps[k].strand == '+'):
                 transcript.hsps[k].strand='+'
+                debug.write('Check after \t' + str(transcript.hsps[k].hit_end) + '\n')
+                if transcript.hsps[k].hit_id in contig_check_outer and transcript.hsps[k].hit_end < contig_check_outer[transcript.hsps[k].hit_id]:
+                    debug.write(transcript.hsps[k].hit_id +'\tok\n')
+                    flag=0
+                else:
+                    pass
             else:
                 transcript.hsps[k].strand='-'
+                debug.write('Check before \t' + str(transcript.hsps[k].hit_start) + '\n')
+                if transcript.hsps[k].hit_id in contig_check_inner and transcript.hsps[k].hit_start > contig_check_inner[transcript.hsps[k].hit_id]:
+                    debug.write(transcript.hsps[k].hit_id +'\tok\n')
+                    flag=0
+                else:
+                    pass                
             if (transcript.hsps[k+1].strand == 1 or transcript.hsps[k+1].strand == '+'):
                 transcript.hsps[k+1].strand='+'
+                debug.write('Check before \t' + str(transcript.hsps[k+1].hit_start) + '\n')
+                if transcript.hsps[k+1].hit_id in contig_check_inner and transcript.hsps[k+1].hit_start > contig_check_inner[transcript.hsps[k+1].hit_id]:
+                    debug.write(transcript.hsps[k].hit_id +'\tok\n')
+                    flag=0
+                else:
+                    pass                
             else:
                 transcript.hsps[k+1].strand='-'
+                debug.write('Check after \t' + str(transcript.hsps[k+1].hit_end) + '\n')
+                if transcript.hsps[k+1].hit_id in contig_check_outer and transcript.hsps[k+1].hit_end < contig_check_outer[transcript.hsps[k+1].hit_id]:
+                    debug.write('ok\n')
+                    flag=0
+                else:
+                    pass                
             if not args.intron_size_run:    
                 p_intron = propable_intron_size(transcript.hsps[k].hit_start,transcript.hsps[k].hit_end,transcript.hsps[k].strand,transcript.hsps[k].hit_length,transcript.hsps[k+1].hit_start,transcript.hsps[k+1].hit_end,transcript.hsps[k+1].strand,transcript.hsps[k+1].hit_length)
                 p.write(str(p_intron) + '\t' + transcript.query_id + '\n')
-                if ((p_intron+args.library_insert_size) < args.maximum_intron_size):
+                if ((p_intron+args.library_insert_size) < args.maximum_intron_size and flag):
                     v.write(transcript.hsps[k].hit_id + '\t' + transcript.query_id + '\t' + transcript.hsps[k+1].hit_id + '\t' + transcript.hsps[k].strand + transcript.hsps[k+1].strand+ '\n')
                     if (transcript.hsps[k].strand == "+" and transcript.hsps[k+1].strand == "+"):
                         connections.append(transcript.hsps[k].hit_id + '/f' + '\t' + transcript.hsps[k+1].hit_id + '/f')
