@@ -20,3 +20,7 @@ Requires a BLAST XML file
 For the same species the default settings for identity cutoff should be okay
 
 The user must specify the max allowed intron size (i.e for nematode species ~ 20000 bp). Alternatively the user can run the program with ```--intron_size_run``` that creates the file intron_size which has the intron sizes calculated by the mapped transcripts
+
+Example command
+
+```SCUBAT_v2.py -b [blast.xml] -f [assembly.file] -max 20000```
