@@ -32,8 +32,6 @@ parser.add_argument('-b','--blastfile', dest='blastfile', required=True,
                    help='BLAST output in xml format [Required]')
 parser.add_argument('-f','--fastafile', dest='fastafile', required=True,
                    help='Contig assembly in fasta format [Required]')
-parser.add_argument('-lrna','--lrnafile', dest='lrnafile',
-                   help='final.path file from L_RNA_scaffolder')
 parser.add_argument('-hid','--hsp_identity_cutoff', type=int,
                    help='BLAST HSP identity cutoff [default: %(default)s]',default=DEFAULT_HSP_IDENTITY_CUTOFF)
 parser.add_argument('-tid','--transcript_identity_cutoff', type=int,
@@ -52,8 +50,11 @@ parser.add_argument('-ns','--number_of_ns', type=int,
                    help='Number of Ns to add when merging [default: %(default)s]',default=DEFAULT_NUMBER_OF_NS)
 parser.add_argument('-isr','--intron_size_run', dest='intron_size_run', action='store_true',
                    help='Estimate insert size based on the data')
+parser.add_argument('--verbose', dest='verbose', action='store_true',
+                   help='Print additional verbose files')
 parser.add_argument('--version', action='version', version='%(prog)s v' + str(VERSION))
 
+parser.set_defaults(verbose=False)
 parser.set_defaults(intron_size_run=False)
 
 if len(sys.argv)==1:
@@ -279,25 +280,26 @@ print 'Program started: ' + localtime
 start = time.time()
 number_of_hits =subprocess.check_output(['grep','-c', '<Iteration>', args.blastfile])
 
-#open the files for testing
 
-h = open('intron_size', 'w')
+h = open('intron_size.txt', 'w')
+print >>h, '#intron_size \t transcript_id'
+#debug = open('debug.txt', 'w')
 
-if not args.intron_size_run:
-    e = open('exon_filter', 'w')
-    s = open('SCUBAT_stats', 'w')
+if not args.intron_size_run and args.verbose:
+    e = open('filtered_blast_output.txt', 'w')
     v = open('Cyto_table_verbose.sif', 'w')
-    p = open('prob_intron', 'w')
-    c = open('connection_removed', 'w')
-    scaffold_file = open('SCUBAT_scaffolds.fasta', 'w')
-    confile = open('final.connections.txt', 'w')
-    confiledict = open('connections.dict.txt', 'w')
+    p = open('prob_intron.txt', 'w')
+    c = open('connection_removed.txt', 'w')
     tr = open('toremove.dict.txt', 'w')
-    qcovfile = open('qcov.txt', 'w')
+    qcovfile = open('transcript_status.txt', 'w')
+    print >>qcovfile, '#transcript_id' + '\t' + 'transcript_coverage' + '\t' + 'identity_percentage' + '\t' + 'status'
     all_connections = open('all_connections.txt', 'w')
-    debug = open('debug.txt', 'w')
     unmapped_transcripts_file = open('unmapped_transcripts.txt', 'w')
 
+if not args.intron_size_run:
+    scaffold_file = open('SCUBAT_scaffolds.fasta', 'w')
+    confiledict = open('connections.dict.txt', 'w')
+    s = open('SCUBAT_stats.txt', 'w')
 
 ####
 #Process BLAST xml
@@ -318,7 +320,8 @@ for qresult in SearchIO.parse(args.blastfile, 'blast-xml'):
     removeOverlappingHits(qresult)
     if len(qresult.hits) == 0:
         no_hit.append(qresult)
-        print >>unmapped_transcripts_file, qresult.id
+        if not args.intron_size_run and args.verbose:
+            print >>unmapped_transcripts_file, qresult.id
     elif len(qresult.hits) == 1:
         if len(hit.hsps) == 1:
             uninformative.append(qresult)
@@ -326,11 +329,9 @@ for qresult in SearchIO.parse(args.blastfile, 'blast-xml'):
             same_contig.append(qresult)
 
         if (hit.hsps[0].hit_start < hit.hsps[-1].hit_end):
-            debug.write(hit.id + '\t' + str(hit.hsps[0].hit_start) + '\t' + str(hit.hsps[-1].hit_end) + '\n')
             contig_check_start = hit.hsps[0].hit_start
             contig_check_end   = hit.hsps[-1].hit_end
         else:
-            debug.write(hit.id + '\t' + str(hit.hsps[-1].hit_start) + '\t' + str(hit.hsps[0].hit_end) + '\n')
             contig_check_start = hit.hsps[-1].hit_start
             contig_check_end   = hit.hsps[0].hit_end
         if hit.id in contig_check_inner:
@@ -370,21 +371,19 @@ for qresult in SearchIO.parse(args.blastfile, 'blast-xml'):
         identity = round(100*(float(identity_number)/alignment_hsp),2)
         if (pers >= args.transcript_coverage_cutoff and identity >= args.transcript_identity_cutoff):
             informative.append(transcript)
-            if not args.intron_size_run:
+            if not args.intron_size_run and args.verbose:
                 print >>qcovfile, transcript.query_id + '\t' + str(pers) + '\t' + str(identity)
         else:
-            if not args.intron_size_run:
+            if not args.intron_size_run and args.verbose:
                 print >>qcovfile, transcript.query_id + '\t' + str(pers) + '\t' + str(identity) + '\t' + 'REMOVED'
     n += 1
     disp_status("Processing BLAST xml...",n,number_of_hits)
 print ''
 
-if not args.intron_size_run:
+if not args.intron_size_run and args.verbose:
     qcovfile.close()
 
 
-print >>debug, contig_check_inner
-print >>debug, contig_check_outer
 
 #####
 # Calculate stats for intron sizes and exon overlaps
@@ -425,7 +424,7 @@ to_remove=[]
 
 for transcript in informative:
     k=0
-    if not args.intron_size_run:
+    if not args.intron_size_run and args.verbose:
         print >>e, transcript
     while k < len(transcript.hsps) -1:
         flag=1
@@ -434,44 +433,37 @@ for transcript in informative:
             intron_sizes.append(intron_size)
             h.write(str(intron_size)+ '\t' + hit.query_id +'\n')
         else:
-            debug.write(transcript.query_id + '\n')
             if (transcript.hsps[k].strand == 1 or transcript.hsps[k].strand == '+'):
                 transcript.hsps[k].strand='+'
-                debug.write('Check after \t' + str(transcript.hsps[k].hit_end) + '\n')
                 if transcript.hsps[k].hit_id in contig_check_outer and transcript.hsps[k].hit_end < contig_check_outer[transcript.hsps[k].hit_id]:
-                    debug.write(transcript.hsps[k].hit_id +'\tok\n')
                     flag=0
                 else:
                     pass
             else:
                 transcript.hsps[k].strand='-'
-                debug.write('Check before \t' + str(transcript.hsps[k].hit_start) + '\n')
                 if transcript.hsps[k].hit_id in contig_check_inner and transcript.hsps[k].hit_start > contig_check_inner[transcript.hsps[k].hit_id]:
-                    debug.write(transcript.hsps[k].hit_id +'\tok\n')
                     flag=0
                 else:
                     pass                
             if (transcript.hsps[k+1].strand == 1 or transcript.hsps[k+1].strand == '+'):
                 transcript.hsps[k+1].strand='+'
-                debug.write('Check before \t' + str(transcript.hsps[k+1].hit_start) + '\n')
                 if transcript.hsps[k+1].hit_id in contig_check_inner and transcript.hsps[k+1].hit_start > contig_check_inner[transcript.hsps[k+1].hit_id]:
-                    debug.write(transcript.hsps[k].hit_id +'\tok\n')
                     flag=0
                 else:
                     pass                
             else:
                 transcript.hsps[k+1].strand='-'
-                debug.write('Check after \t' + str(transcript.hsps[k+1].hit_end) + '\n')
                 if transcript.hsps[k+1].hit_id in contig_check_outer and transcript.hsps[k+1].hit_end < contig_check_outer[transcript.hsps[k+1].hit_id]:
-                    debug.write('ok\n')
                     flag=0
                 else:
                     pass                
             if not args.intron_size_run:    
                 p_intron = propable_intron_size(transcript.hsps[k].hit_start,transcript.hsps[k].hit_end,transcript.hsps[k].strand,transcript.hsps[k].hit_length,transcript.hsps[k+1].hit_start,transcript.hsps[k+1].hit_end,transcript.hsps[k+1].strand,transcript.hsps[k+1].hit_length)
-                p.write(str(p_intron) + '\t' + transcript.query_id + '\n')
+                if args.verbose:
+                    p.write(str(p_intron) + '\t' + transcript.query_id + '\n')
                 if ((p_intron+args.library_insert_size) < args.maximum_intron_size and flag):
-                    v.write(transcript.hsps[k].hit_id + '\t' + transcript.query_id + '\t' + transcript.hsps[k+1].hit_id + '\t' + transcript.hsps[k].strand + transcript.hsps[k+1].strand+ '\n')
+                    if args.verbose:
+                        v.write(transcript.hsps[k].hit_id + '\t' + transcript.query_id + '\t' + transcript.hsps[k+1].hit_id + '\t' + transcript.hsps[k].strand + transcript.hsps[k+1].strand+ '\n')
                     if (transcript.hsps[k].strand == "+" and transcript.hsps[k+1].strand == "+"):
                         connections.append(transcript.hsps[k].hit_id + '/f' + '\t' + transcript.hsps[k+1].hit_id + '/f')
                         connections.append(transcript.hsps[k+1].hit_id + '/r' + '\t' + transcript.hsps[k].hit_id + '/r')
@@ -485,7 +477,8 @@ for transcript in informative:
                         connections.append(transcript.hsps[k].hit_id + '/r' + '\t' + transcript.hsps[k+1].hit_id + '/r')
                         connections.append(transcript.hsps[k+1].hit_id + '/f' + '\t' + transcript.hsps[k].hit_id + '/f')                  
                 else:
-                    c.write(transcript.hsps[k].hit_id + '\t' + transcript.query_id + '\t' + transcript.hsps[k+1].hit_id + '\t' + str(p_intron) + '\n')
+                    if args.verbose:
+                        c.write(transcript.hsps[k].hit_id + '\t' + transcript.query_id + '\t' + transcript.hsps[k+1].hit_id + '\t' + str(p_intron) + '\n')
                     conn_removed += 1
         k += 1
     n += 1
@@ -497,11 +490,12 @@ print ''
 if args.intron_size_run:
     sys.exit()
 
-e.close()
-p.close()
-v.close()
-c.close()
-unmapped_transcripts_file.close()
+if args.verbose:
+    e.close()
+    p.close()
+    v.close()
+    c.close()
+    unmapped_transcripts_file.close()
 
 transcripts_passed = 0
 transcripts_failed = 0
@@ -525,10 +519,10 @@ for transcript in informative:
 
 connections = list(set(connections))
 
-for conn in connections:
-    print >>all_connections, conn
-
-all_connections.close()
+if args.verbose:
+    for conn in connections:
+        print >>all_connections, conn
+    all_connections.close()
     
 precs=[]
 sucs=[]
@@ -540,15 +534,14 @@ for conn in connections:
 precs_duplicates= list (set([x for x in precs if precs.count(x) > 1]))
 sucs_duplicates= list (set([x for x in sucs if sucs.count(x) > 1]))
 
-print >>tr, "#precs"
-for trm in precs_duplicates:
-    print >>tr, trm
-    
-print >>tr, "#sucs"
-for trm in sucs_duplicates:
-    print >>tr, trm
-
-print >>tr, "#connections removed"
+if args.verbose:
+    print >>tr, "#precs"
+    for trm in precs_duplicates:
+        print >>tr, trm
+    print >>tr, "#sucs"
+    for trm in sucs_duplicates:
+        print >>tr, trm
+    print >>tr, "#connections removed"
 
 nodes = {}
 start_nodes = set()
@@ -558,29 +551,23 @@ all_nodes = set()
 for conn in connections:
     pre,suc = conn.split('\t')
     if (pre in precs_duplicates or suc in sucs_duplicates):
-        print >>tr, conn
+        if args.verbose:
+            print >>tr, conn
     else:
         nodes[pre] = suc
         start_nodes.add(pre)
         all_nodes.add(pre[:-2])
         all_nodes.add(suc[:-2])
 
-
-if args.lrnafile is not None:
-    lrna_list = [re.split('->N\(\d*\)->', line.rstrip('\n')) for line in open(args.lrnafile)]
-    print >>debug, lrna_list[0]
-    print >>debug, lrna_list[1]
-
-
-
-tr.close()
+if args.verbose:
+    tr.close()
 start_nodes -= set(nodes.values())
 
 paths = []
 contigs = {}
 
 for record in SeqIO.parse(args.fastafile, "fasta") :
-    contigs[record.id] = record.seq.tostring()
+    contigs[record.id] = str(record.seq)
 
 
 string_of_ns = "N" * args.number_of_ns
@@ -635,8 +622,8 @@ s.write('Transcripts with no hits:' + str(len(no_hit))  + '\n')
 s.write('Transcripts more than ' + str(DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG) + ' in one contig:' + str(transcripts_passed_number) + '\n')
 s.write('Transcripts less than ' + str(DEFAULT_TRANSCRIPT_COVERAGE_ONE_CONTIG) + ' in one contig:' + str(transcripts_failed)        + '\n')
 
-
 s.close()
+
 #####
 # Ending prints
 #####
